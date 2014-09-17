@@ -52,6 +52,20 @@ app.get('/SendPaymentNotification', function(req, res) {
   	res.send('Success');
 });
 
+app.get('/GetSaleStatistics', function(req, res) {
+	
+	var url_parts = url.parse(req.url, true);
+	var params = url_parts.query;
+
+	var temp = {
+		date: params.date,
+		count : new Date().getHours()
+	};
+
+	res.setHeader("Content-Type", "application/json");
+	res.send(JSON.stringify(temp));
+});
+
 app.get('/GetGeoData', function(req, res) {
 
 	var url_parts = url.parse(req.url, true);
