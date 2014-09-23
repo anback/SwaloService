@@ -133,4 +133,119 @@ var sendmail = function(params) {
 		        console.log("Message sent: " + response.message + ", subject: " + subject);
 		    }
 		});
-}			
+}
+
+app.get('/GetBankUrl', function(req, res) {
+	var url_parts = url.parse(req.url, true);
+	var params = url_parts.query;
+	var baseUri = 'https://www.swalo.de/Pay.aspx?bookingnumber=' + params.bookingnumber + '&amp;email=' + params.email;
+	var totalPrice = parseFloat(params.totalPrice);
+
+	var json = {
+		multipay : {
+		  amount : totalPrice,
+		  currency_code : "EUR",
+		  reasons : {
+		    reason : params.bookingnumber
+		  },
+		  notification_urls : 
+		  {
+		  		notification_url : '<![CDATA[' + getNotificationUrl(params.bookingnumber, params.email, params.po) + ']]>'
+		  },
+		  su : {},
+		  project_id : 179503,
+		  success_url : baseUri + '&amp;ispaid=1&amp;waitforpaymentconfirmation=1',
+		  abort_url : baseUri
+		}
+	}
+
+  	var xml = json2xml(json);
+  	xml = xml.replace('notification_url>', 'notification_url notify_on=\"pending,recieved\">');
+  	
+	//Build Sofort Request
+	options = {
+		url : 'https://api.sofort.com/api/xml',
+		method : "POST",
+		headers : {
+			Authorization : "Basic ODQ0NzQ6NzQ5NWU3MWU3ZDg5OTE2MTU1NTk2Y2JjYWY1YTVhY2U="
+		},
+		body : xml
+	};
+
+	console.log(xml);
+
+	request(options, function(err, response, body) {
+		
+		var temp = undefined;
+		if(err)
+		{
+			temp = err;
+		}
+
+		var splits = body.split('<payment_url>');
+
+		if(splits.length > 1)
+			temp = splits[1].split('</payment_url>')[0];
+		res.send(temp);
+	});
+});
+
+function getNotificationUrl(bookingnumber, email, po) {
+	var url = "https://www.swalo.de/Pay.aspx?bookingnumber=";
+	url +=  bookingnumber;
+	url += "&email=";
+	url += email;
+	url += "&isFrontEndSolutionPayment=true&isSuccess=true";
+	url += "&po=" + po;
+	return url;
+}
+
+function replaceAll(find, replace, str) {
+  return str.replace(new RegExp(find, 'g'), replace);
+}
+
+function getParameterByName(name) {
+    name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
+    var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
+        results = regex.exec(location.search);
+    return results == null ? "" : results[1].replace(/\+/g, " ");
+}
+
+function json2xml(o, tab) {
+   var toXml = function(v, name, ind) {
+      var xml = "";
+      if (v instanceof Array) {
+         for (var i=0, n=v.length; i<n; i++)
+            xml += ind + toXml(v[i], name, ind+"\t") + "\n";
+      }
+      else if (typeof(v) == "object") {
+         var hasChild = false;
+         xml += ind + "<" + name;
+         for (var m in v) {
+            if (m.charAt(0) == "@")
+               xml += " " + m.substr(1) + "=\"" + v[m].toString() + "\"";
+            else
+               hasChild = true;
+         }
+         xml += hasChild ? ">" : "/>";
+         if (hasChild) {
+            for (var m in v) {
+               if (m == "#text")
+                  xml += v[m];
+               else if (m == "#cdata")
+                  xml += "<![CDATA[" + v[m] + "]]>";
+               else if (m.charAt(0) != "@")
+                  xml += toXml(v[m], m, ind+"\t");
+            }
+            xml += (xml.charAt(xml.length-1)=="\n"?ind:"") + "</" + name + ">";
+         }
+      }
+      else {
+         xml += ind + "<" + name + ">" + v.toString() +  "</" + name + ">";
+      }
+      return xml;
+   }, xml="";
+   for (var m in o)
+      xml += toXml(o[m], m, "");
+   return tab ? xml.replace(/\t/g, tab) : xml.replace(/\t|\n/g, "");
+}
