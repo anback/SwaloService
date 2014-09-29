@@ -9,6 +9,7 @@ var mongoUrl = 'mongodb://localhost:27017/test';
 
 var MongoClient = require('mongodb').MongoClient;
 var mongodb = {};
+var cache = require('memory-cache');
 
 console.log('Connecting to ' + mongoUrl + ' .. ')
 MongoClient.connect(mongoUrl, function(err, db) {
@@ -143,10 +144,11 @@ app.get('/GetBankUrl', function(req, res) {
 	var baseUri = 'https://www.swalo.de/Pay.aspx?bookingnumber=' + params.bookingnumber + '&amp;email=' + params.email;
 	var totalPrice = parseFloat(params.totalPrice);
 
-	if(bankUrlCache[params.bookingnumber] != undefined)
+	var cachedUrl = cache.get(params.bookingnumber+params.po);
+	if(cachedUrl != undefined)
 	{
-		res.send(bankUrlCache[params.bookingnumber]);
-		return; 
+		res.send(cachedUrl);
+		return;
 	}
 
 	var json = {
@@ -195,7 +197,7 @@ app.get('/GetBankUrl', function(req, res) {
 		if(splits.length > 1)
 			temp = splits[1].split('</payment_url>')[0];
 
-		bankUrlCache[params.bookingnumber] = temp;
+		cache.put(params.bookingnumber+params.po, temp, 30 * 60 * 1000);
 		res.send(temp);
 	});
 });
