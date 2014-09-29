@@ -144,15 +144,6 @@ app.get('/GetBankUrl', function(req, res) {
 	var baseUri = 'https://www.swalo.de/Pay.aspx?bookingnumber=' + params.bookingnumber + '&amp;email=' + params.email;
 	var totalPrice = parseFloat(params.totalPrice);
 
-	/*
-	var cachedUrl = cache.get(params.bookingnumber+params.po);
-	if(cachedUrl != undefined)
-	{
-		res.send(cachedUrl);
-		return;
-	}
-	*/
-
 	var json = {
 		multipay : {
 		  amount : totalPrice,
@@ -198,8 +189,7 @@ app.get('/GetBankUrl', function(req, res) {
 
 		if(splits.length > 1)
 			temp = splits[1].split('</payment_url>')[0];
-
-		cache.put(params.bookingnumber+params.po, temp, 30 * 60 * 1000);
+		
 		res.send(temp);
 	});
 });
