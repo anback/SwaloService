@@ -135,11 +135,19 @@ var sendmail = function(params) {
 		});
 }
 
+var bankUrlCache = {};
+
 app.get('/GetBankUrl', function(req, res) {
 	var url_parts = url.parse(req.url, true);
 	var params = url_parts.query;
 	var baseUri = 'https://www.swalo.de/Pay.aspx?bookingnumber=' + params.bookingnumber + '&amp;email=' + params.email;
 	var totalPrice = parseFloat(params.totalPrice);
+
+	if(bankUrlCache[params.bookingnumber] != undefined)
+	{
+		res.send(bankUrlCache[params.bookingnumber]);
+		return; 
+	}
 
 	var json = {
 		multipay : {
@@ -186,6 +194,8 @@ app.get('/GetBankUrl', function(req, res) {
 
 		if(splits.length > 1)
 			temp = splits[1].split('</payment_url>')[0];
+
+		bankUrlCache[params.bookingnumber] = temp;
 		res.send(temp);
 	});
 });
