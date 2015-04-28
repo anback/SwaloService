@@ -12,36 +12,6 @@ app.listen(port, function() {
 });
 var logcount = 0;
 
-app.get('/GetGeoData', function(req, res) {
-	logcount++;
-	var url_parts = url.parse(req.url, true);
-	var params = url_parts.query;
-
-	var ip = "";
-	if(params.ip != undefined)
-		ip = params.ip;
-	else
-		ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-
-	//Handle ips with format: 83.140.153.60:36492, 83.140.154.254
-	if(ip.split(',').length > 1)
-		ip = ip.split(',')[0];
-	if(ip.split(':').length > 1)
-		ip = ip.split(':')[0];
-
-    var geoUrl = 'http://api.geoips.com/ip/';
-    geoUrl += ip;
-    geoUrl += '/key/847580c96fd0c8fb49cadafeb4ec7d29/output/json';
-    
-    request(geoUrl, function(error, response, body) {
-    	if(error)
-    		res.send('error');
-    	res.send(body);
-    });	
-
-    console.log('Processed ' + logcount++ + ' transactions.');
-});
-
 app.get('/GetBankUrl', function(req, res) {
 	logcount++;
 	var url_parts = url.parse(req.url, true);
