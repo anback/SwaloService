@@ -194,6 +194,73 @@ app.get('/GetBankUrl', function(req, res) {
 	});
 });
 
+function getQueryParams(qs) {
+    qs = qs.split("+").join(" ");
+
+    var params = {}, tokens,
+        re = /[?&]?([^=]+)=([^&]*)/g;
+
+    while (tokens = re.exec(qs)) {
+        params[decodeURIComponent(tokens[1])]
+            = decodeURIComponent(tokens[2]);
+    }
+
+    return params;
+}
+
+app.get('/SofortRebooking', function(req, res) {
+	var params = getQueryParams(req.url.split('?')[1]);
+	var totalPrice = parseFloat(params.totalPrice);
+	var urlTemplate = 'https://www.swalo.de/Booking.aspx?';
+	var url = urlTemplate + 'bookingnumber=' + params.bookingnumber + '&amp;email=' + params.email;
+
+	//https://www.swalo.de/Booking.aspx?bookingnumber=18502&email=igorlarbac%40gmail.com
+
+	var json = {
+		multipay : {
+		  amount : totalPrice,
+		  currency_code : "EUR",
+		  reasons : {
+		    reason : params.bookingnumber
+		  },
+		  su : {},
+		  project_id : 179503,
+		  success_url : url,
+		  abort_url : url
+		}
+	}
+
+  	var xml = json2xml(json);
+  	
+	//Build Sofort Request
+	options = {
+		url : 'https://api.sofort.com/api/xml',
+		method : "POST",
+		headers : {
+			Authorization : "Basic ODQ0NzQ6NzQ5NWU3MWU3ZDg5OTE2MTU1NTk2Y2JjYWY1YTVhY2U="
+		},
+		body : xml
+	};
+
+	console.log(xml);
+
+	request(options, function(err, response, body) {
+		
+		var temp = undefined;
+		if(err)
+		{
+			temp = err;
+		}
+
+		var splits = body.split('<payment_url>');
+
+		if(splits.length > 1)
+			temp = splits[1].split('</payment_url>')[0];
+		
+		res.send(temp);
+	});
+});
+
 function getNotificationUrl(bookingnumber, email, po) {
 	var url = "https://www.swalo.de/Pay.aspx?bookingnumber=";
 	url +=  bookingnumber;
