@@ -4,71 +4,16 @@ var url = require('url');
 var request = require('request');
 var bodyParser = require('body-parser')
 var app = express();
-app.use(bodyParser.json())
-var mongoUrl = 'mongodb://localhost:27017/test';
+app.use(bodyParser.json());
 
-var MongoClient = require('mongodb').MongoClient;
-var mongodb = {};
-var cache = require('memory-cache');
-
-console.log('Connecting to ' + mongoUrl + ' .. ')
-MongoClient.connect(mongoUrl, function(err, db) {
-	
-	if(err) {
-		console.log(err);
-		return;
-	}
-	
-	console.log('Connection Established!')
-	mongodb = db;
+var port = Number(process.env.PORT || 5000);
+app.listen(port, function() {
+  console.log("Listening on " + port);
 });
-
-app.get('/GetBooking', function(req,res) {
-	var bookingnumber = req.url.split('bookingnumber=')[1];
-	var collection = mongodb.collection('bookings');
-		collection.findOne({_id : bookingnumber}, function(err, docs) {
-			res.send(docs);
-		});
-});
-
-app.post('/SaveBooking', function(req,resp) {
-	var booking = req.body;
-	booking._id = booking.BookingNumber;
-	
-	var collection = mongodb.collection('bookings');
-	collection.save(booking, function(err, res) {
-		console.log(err);
-		console.log(res);
-		if(err)
-			resp.send(err);
-		resp.send(res)
-	})
-});
-
-app.get('/SendPaymentNotification', function(req, res) {
-	
-	var url_parts = url.parse(req.url, true);
-	var params = url_parts.query;
-	sendmail(params);
-  	res.send('Success');
-});
-
-app.get('/GetSaleStatistics', function(req, res) {
-	
-	var url_parts = url.parse(req.url, true);
-	var params = url_parts.query;
-
-	var temp = {
-		date: params.date,
-		count : new Date().getHours()
-	};
-
-	res.setHeader("Content-Type", "application/json");
-	res.send(JSON.stringify(temp));
-});
+var logcount = 0;
 
 app.get('/GetGeoData', function(req, res) {
-
+	logcount++;
 	var url_parts = url.parse(req.url, true);
 	var params = url_parts.query;
 
@@ -93,52 +38,12 @@ app.get('/GetGeoData', function(req, res) {
     		res.send('error');
     	res.send(body);
     });	
+
+    console.log('Processed ' + logcount++ + ' transactions.');
 });
-
-var port = Number(process.env.PORT || 5000);
-app.listen(port, function() {
-  console.log("Listening on " + port);
-});
-
-
-var sendmail = function(params) {
-		var nodemailer = require("nodemailer");
-		var smtpTransport = nodemailer.createTransport("SMTP",{
-		    service: "Gmail",
-		    auth: {
-		        user: "anders@swedishtravelmafia.com",
-		        pass: "86kAanan"
-		    }
-		});
-
-		var subject = 'Successful Payment Recieved. Email: ' + params.eMail;
-
-		var text =  'DibsReferenceNo:' 	+ params.referenceNo 		+ '\n' + 
-					'BillingFirstName:' + params.billingFirstName 	+ '\n' + 
-					'BillingLastName:' 	+ params.billingLastName 	+ '\n' + 
-					'eMail:' 			+ params.eMail 				+ '\n' + 
-					'Sum:'				+ params.sum + ' ' + params.currency;
-		
-		var mailOptions = {
-			from: "anders.back@me.com", 
-		    to: "payment-notification@swalo.de",
-		    subject: subject,
-		    text: text
-		};
-
-		//Send Mail
-		smtpTransport.sendMail(mailOptions, function(error, response){
-		    if(error){
-		        console.log(error);
-		    }else{
-		        console.log("Message sent: " + response.message + ", subject: " + subject);
-		    }
-		});
-}
-
-var bankUrlCache = {};
 
 app.get('/GetBankUrl', function(req, res) {
+	logcount++;
 	var url_parts = url.parse(req.url, true);
 	var params = url_parts.query;
 	var baseUri = 'https://www.swalo.de/Pay.aspx?bookingnumber=' + params.bookingnumber + '&amp;email=' + params.email;
@@ -192,74 +97,10 @@ app.get('/GetBankUrl', function(req, res) {
 		
 		res.send(temp);
 	});
+
+	console.log('Processed ' + logcount++ + ' transactions.');
 });
 
-function getQueryParams(qs) {
-    qs = qs.split("+").join(" ");
-
-    var params = {}, tokens,
-        re = /[?&]?([^=]+)=([^&]*)/g;
-
-    while (tokens = re.exec(qs)) {
-        params[decodeURIComponent(tokens[1])]
-            = decodeURIComponent(tokens[2]);
-    }
-
-    return params;
-}
-
-app.get('/SofortRebooking', function(req, res) {
-	var params = getQueryParams(req.url.split('?')[1]);
-	var totalPrice = parseFloat(params.totalPrice);
-	var urlTemplate = 'https://www.swalo.de/Booking.aspx?';
-	var url = urlTemplate + 'bookingnumber=' + params.bookingnumber + '&amp;email=' + params.email;
-
-	//https://www.swalo.de/Booking.aspx?bookingnumber=18502&email=igorlarbac%40gmail.com
-
-	var json = {
-		multipay : {
-		  amount : totalPrice,
-		  currency_code : "EUR",
-		  reasons : {
-		    reason : params.bookingnumber
-		  },
-		  su : {},
-		  project_id : 179503,
-		  success_url : url,
-		  abort_url : url
-		}
-	}
-
-  	var xml = json2xml(json);
-  	
-	//Build Sofort Request
-	options = {
-		url : 'https://api.sofort.com/api/xml',
-		method : "POST",
-		headers : {
-			Authorization : "Basic ODQ0NzQ6NzQ5NWU3MWU3ZDg5OTE2MTU1NTk2Y2JjYWY1YTVhY2U="
-		},
-		body : xml
-	};
-
-	console.log(xml);
-
-	request(options, function(err, response, body) {
-		
-		var temp = undefined;
-		if(err)
-		{
-			temp = err;
-		}
-
-		var splits = body.split('<payment_url>');
-
-		if(splits.length > 1)
-			temp = splits[1].split('</payment_url>')[0];
-		
-		res.send(temp);
-	});
-});
 
 function getNotificationUrl(bookingnumber, email, po) {
 	var url = "https://www.swalo.de/Pay.aspx?bookingnumber=";
@@ -271,16 +112,6 @@ function getNotificationUrl(bookingnumber, email, po) {
 	return url;
 }
 
-function replaceAll(find, replace, str) {
-  return str.replace(new RegExp(find, 'g'), replace);
-}
-
-function getParameterByName(name) {
-    name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
-    var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
-        results = regex.exec(location.search);
-    return results == null ? "" : results[1].replace(/\+/g, " ");
-}
 
 function json2xml(o, tab) {
    var toXml = function(v, name, ind) {
